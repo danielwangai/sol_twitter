@@ -11,6 +11,10 @@ const TWEET_SIZE: usize = 8 // discriminator length
      // + 1; // bump
 
 pub fn post_tweet(ctx: Context<PostTweet>, content: String) -> Result<()> {
+    if content == "" {
+        return Err(TwitterError::TweetContentRequired.into());
+    }
+
     if content.chars().count() > MaxTweetContentLength {
         return Err(TwitterError::TweetContentTooLong.into());
     }

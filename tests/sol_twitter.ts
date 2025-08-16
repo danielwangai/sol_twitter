@@ -12,6 +12,9 @@ describe("sol_twitter", () => {
   const bob = anchor.web3.Keypair.generate();
 
   let content1 = "Hello, World!";
+  let content2 = "a new tweet";
+  let content3 = "looking for a new role guys. Please share some leads :-)";
+  let emptyContent = "";
   const TWEET_SEED = "TWEET_SEED";
 
   it("can send a new tweet", async () => {
@@ -79,6 +82,38 @@ describe("sol_twitter", () => {
       "Failed",
       "Tweet initialization should have failed with topic longer than 32 bytes",
     );
+  });
+
+  it("does not post a new tweet with empty content", async () => {
+    try {
+      // derive PDA for tweet
+      let [tweetPDA] = await PublicKey.findProgramAddressSync(
+        [
+          anchor.utils.bytes.utf8.encode(TWEET_SEED),
+          anchor.utils.bytes.utf8.encode(emptyContent),
+          bob.publicKey.toBuffer(),
+        ],
+        program.programId,
+      );
+
+      //     post new tweet
+      await program.methods
+        .postNewTweet(emptyContent)
+        .accounts({
+          author: bob.publicKey,
+          tweet: tweetPDA,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([bob])
+        .rpc({ commitment: "confirmed" });
+    } catch (error) {
+      const err = anchor.AnchorError.parse(error.logs);
+      assert.strictEqual(
+        err.error.errorCode.code,
+        "TweetContentRequired",
+        "Expected 'TweetContentRequired' error for empty content",
+      );
+    }
   });
 
   // helpers
