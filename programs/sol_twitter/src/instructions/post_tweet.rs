@@ -28,7 +28,7 @@ pub fn post_tweet(ctx: Context<PostTweet>, content: String) -> Result<()> {
     tweet.timestamp = clock.unix_timestamp;
     tweet.likes = 0;
     tweet.dislikes = 0;
-    // tweet.bump = ctx.bumps.tweet;
+    tweet.bump = ctx.bumps.tweet;
 
     Ok(())
 }
