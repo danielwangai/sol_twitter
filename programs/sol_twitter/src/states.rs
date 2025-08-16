@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 pub const MaxTweetContentLength: usize = 280; // 280 chars max.
+pub const TWEET_SEED: &str = "TWEET_SEED";
 
 #[account]
 #[derive(InitSpace)]

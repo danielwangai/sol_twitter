@@ -8,11 +8,11 @@ const TWEET_SIZE: usize = 8 // discriminator length
 + 8 // timestamp
 + 8 // likes
 + 8; // dislikes
-// + 1; // bump
+     // + 1; // bump
 
 pub fn post_tweet(ctx: Context<PostTweet>, content: String) -> Result<()> {
     if content.chars().count() > MaxTweetContentLength {
-    return Err(TwitterError::TweetContentTooLong.into());
+        return Err(TwitterError::TweetContentTooLong.into());
     }
 
     let tweet: &mut Account<Tweet> = &mut ctx.accounts.tweet;
@@ -32,9 +32,15 @@ pub fn post_tweet(ctx: Context<PostTweet>, content: String) -> Result<()> {
 #[derive(Accounts)]
 #[instruction(content: String)]
 pub struct PostTweet<'info> {
-    #[account(init, payer = author, space = TWEET_SIZE, )]
-    pub tweet: Account<'info, Tweet>,
     #[account(mut)]
     pub author: Signer<'info>,
+    #[account(
+        init,
+        payer = author,
+        space = TWEET_SIZE,
+        seeds = [TWEET_SEED.as_bytes(), content.as_bytes(), author.key().as_ref()],
+        bump,
+    )]
+    pub tweet: Account<'info, Tweet>,
     pub system_program: Program<'info, System>,
 }
