@@ -14,4 +14,8 @@ pub mod solana_twitter {
     pub fn post_new_tweet(ctx: Context<PostTweet>, content: String) -> Result<()> {
         post_tweet(ctx, content)
     }
+
+    pub fn post_new_comment(ctx: Context<PostComment>, content: String) -> Result<()> {
+        post_comment(ctx, content)
+    }
 }

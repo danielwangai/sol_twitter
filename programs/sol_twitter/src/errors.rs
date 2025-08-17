@@ -6,4 +6,8 @@ pub enum TwitterError {
     TweetContentTooLong,
     #[msg("The content cannot be empty")]
     TweetContentRequired,
+    #[msg("Comment is required")]
+    CommentRequired,
+    #[msg("The comment should be at most 280 characters long")]
+    CommentTooLong,
 }
