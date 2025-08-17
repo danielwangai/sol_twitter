@@ -3,6 +3,10 @@ import { Program } from "@coral-xyz/anchor";
 import { SolanaTwitter } from "../target/types/solana_twitter";
 import * as assert from "assert";
 import { PublicKey } from "@solana/web3.js";
+import crypto from "crypto";
+
+const TWEET_SEED = "TWEET_SEED";
+const COMMENT_SEED = "COMMENT_SEED";
 
 describe("sol_twitter", () => {
   // Configure the client to use the local cluster.
@@ -15,19 +19,15 @@ describe("sol_twitter", () => {
   let content2 = "a new tweet";
   let content3 = "looking for a new role guys. Please share some leads :-)";
   let emptyContent = "";
-  const TWEET_SEED = "TWEET_SEED";
 
   describe("Post tweet", async () => {
     it("can send a new tweet", async () => {
       const sig = await airdrop(bob.publicKey);
       await program.provider.connection.confirmTransaction(sig, "confirmed");
 
-      const [tweetPDA] = await PublicKey.findProgramAddressSync(
-        [
-          anchor.utils.bytes.utf8.encode(TWEET_SEED),
-          anchor.utils.bytes.utf8.encode(content1),
-          bob.publicKey.toBuffer(),
-        ],
+      let [tweetPDA] = getTweetAddress(
+        content1,
+        bob.publicKey,
         program.programId,
       );
 
@@ -53,12 +53,9 @@ describe("sol_twitter", () => {
       let should_fail = "This Should Fail";
       const longContent = "a".repeat(300);
       try {
-        const [tweetPDA] = await PublicKey.findProgramAddressSync(
-          [
-            anchor.utils.bytes.utf8.encode(TWEET_SEED),
-            anchor.utils.bytes.utf8.encode(longContent),
-            bob.publicKey.toBuffer(),
-          ],
+        let [tweetPDA] = getTweetAddress(
+          longContent,
+          bob.publicKey,
           program.programId,
         );
         await program.methods
@@ -88,12 +85,9 @@ describe("sol_twitter", () => {
     it("does not post a new tweet with empty content", async () => {
       try {
         // derive PDA for tweet
-        let [tweetPDA] = await PublicKey.findProgramAddressSync(
-          [
-            anchor.utils.bytes.utf8.encode(TWEET_SEED),
-            anchor.utils.bytes.utf8.encode(emptyContent),
-            bob.publicKey.toBuffer(),
-          ],
+        let [tweetPDA] = getTweetAddress(
+          emptyContent,
+          bob.publicKey,
           program.programId,
         );
 
@@ -122,12 +116,9 @@ describe("sol_twitter", () => {
 
       for (let i = 1; i <= 3; i++) {
         let content = "tweet " + i;
-        let [tweetPDA] = await PublicKey.findProgramAddressSync(
-          [
-            anchor.utils.bytes.utf8.encode(TWEET_SEED),
-            anchor.utils.bytes.utf8.encode(content),
-            bob.publicKey.toBuffer(),
-          ],
+        let [tweetPDA] = getTweetAddress(
+          content,
+          bob.publicKey,
           program.programId,
         );
 
@@ -156,6 +147,21 @@ describe("sol_twitter", () => {
     return await program.provider.connection.requestAirdrop(
       publicKey,
       1_000_000_000, // 1 SOL
+    );
+  };
+
+  const getTweetAddress = (
+    content: string,
+    author: PublicKey,
+    programID: PublicKey,
+  ) => {
+    return PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode(TWEET_SEED),
+        anchor.utils.bytes.utf8.encode(content),
+        author.toBuffer(),
+      ],
+      programID,
     );
   };
 });

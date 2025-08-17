@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-sol_twitter = "2AJsjtSrGowm3ofSnFCUvfRZqng4DXdBXE4KHmj2jgSC"
+sol_twitter = "6mbRzxbCKNTQjbTDx6dLm1ddcyyEXT8uE58rQimSvKLJ"
 
 [registry]
 url = "https://api.apr.dev"
