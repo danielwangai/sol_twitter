@@ -10,4 +10,14 @@ pub enum TwitterError {
     CommentRequired,
     #[msg("The comment should be at most 280 characters long")]
     CommentTooLong,
+    #[msg("Maximum number of Likes Reached")]
+    MaxLikesReached,
+    #[msg("Maximum number of dislikes Reached")]
+    MaxDislikesReached,
+    #[msg("Cannot like more than once")]
+    CannotLikeMoreThanOnce,
+    #[msg("Cannot dislike more than once")]
+    CannotDislikeMoreThanOnce,
+    #[msg("User not authorized to perform this action")]
+    Unauthorized,
 }

@@ -7,6 +7,7 @@ import crypto from "crypto";
 
 const TWEET_SEED = "TWEET_SEED";
 const COMMENT_SEED = "COMMENT_SEED";
+const REACTION_SEED = "REACTION_SEED";
 
 describe("sol_twitter", () => {
   // Configure the client to use the local cluster.
@@ -17,6 +18,7 @@ describe("sol_twitter", () => {
   const bob = anchor.web3.Keypair.generate();
   const alice = anchor.web3.Keypair.generate();
   const james = anchor.web3.Keypair.generate();
+  const kama = anchor.web3.Keypair.generate();
 
   // tweets
   let content1 = "Hello, World!";
@@ -432,6 +434,295 @@ describe("sol_twitter", () => {
     });
   });
 
+  describe("Add tweet reaction", async () => {
+    let bobTweetPDA: anchor.web3.PublicKey;
+    let aliceTweetPDA: anchor.web3.PublicKey;
+    let aliceReactionPDA: anchor.web3.PublicKey;
+    let kamaReactionPDA1: anchor.web3.PublicKey;
+    let kamaReactionPDA2: anchor.web3.PublicKey;
+
+    beforeEach(async () => {
+      await airdrop(bob.publicKey);
+      await airdrop(alice.publicKey);
+      await airdrop(kama.publicKey);
+
+      // make every tweet created unique on every run to avoid getting the error
+      // Allocate: account ... already in use
+      let content = content1 + Date.now().toString();
+
+      // PDAs
+      [bobTweetPDA] = getTweetAddress(
+        content,
+        bob.publicKey,
+        program.programId,
+      );
+      [aliceTweetPDA] = getTweetAddress(
+        content,
+        alice.publicKey,
+        program.programId,
+      );
+      [aliceReactionPDA] = getReactionAddress(
+        alice.publicKey,
+        bobTweetPDA,
+        program.programId,
+      );
+      [kamaReactionPDA1] = getReactionAddress(
+        kama.publicKey,
+        bobTweetPDA,
+        program.programId,
+      );
+      [kamaReactionPDA2] = getReactionAddress(
+        kama.publicKey,
+        aliceTweetPDA,
+        program.programId,
+      );
+
+      // bob posts a tweet
+      await program.methods
+        .postNewTweet(content)
+        .accounts({
+          author: bob.publicKey,
+          tweet: bobTweetPDA,
+        })
+        .signers([bob])
+        .rpc();
+
+      // alice posts a tweet
+      await program.methods
+        .postNewTweet(content)
+        .accounts({
+          author: alice.publicKey,
+          tweet: aliceTweetPDA,
+        })
+        .signers([alice])
+        .rpc();
+
+      // alice likes bob's tweet
+      await program.methods
+        .likeTweet()
+        .accounts({
+          author: alice.publicKey,
+          reaction: aliceReactionPDA,
+          tweet: bobTweetPDA,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([alice])
+        .rpc({ commitment: "confirmed" });
+
+      // kama dislikes bob's tweet
+      await program.methods
+        .dislikeTweet()
+        .accounts({
+          author: kama.publicKey,
+          reaction: kamaReactionPDA1,
+          tweet: bobTweetPDA,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([kama])
+        .rpc({ commitment: "confirmed" });
+
+      // kama dislikes alice's tweet
+      await program.methods
+        .dislikeTweet()
+        .accounts({
+          author: kama.publicKey,
+          reaction: kamaReactionPDA2,
+          tweet: aliceTweetPDA,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([kama])
+        .rpc({ commitment: "confirmed" });
+    });
+
+    it("should successfully like a tweet", async () => {
+      await airdrop(james.publicKey);
+      // alice wants to like bob's tweet
+      let [jamesReactionPDA] = getReactionAddress(
+        james.publicKey,
+        bobTweetPDA,
+        program.programId,
+      );
+
+      // get likes count before
+      let tweet = await program.account.tweet.fetch(bobTweetPDA);
+      let likesCountBefore = tweet.likes.toNumber();
+
+      await program.methods
+        .likeTweet()
+        .accounts({
+          author: james.publicKey,
+          reaction: jamesReactionPDA,
+          tweet: bobTweetPDA,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([james])
+        .rpc({ commitment: "confirmed" });
+
+      // fetch tweet
+      tweet = await program.account.tweet.fetch(bobTweetPDA);
+      assert.equal(tweet.likes.toNumber(), likesCountBefore + 1);
+
+      // fetch tweet reaction
+      const tweetReaction = await program.account.reaction.fetch(
+        jamesReactionPDA,
+      );
+      assert.equal(tweetReaction.author.toBase58(), james.publicKey);
+    });
+
+    it("should successfully dislike a tweet", async () => {
+      await airdrop(james.publicKey);
+      // james wants to like bob's tweet
+      let [jamesReactionPDA] = getReactionAddress(
+        james.publicKey,
+        bobTweetPDA,
+        program.programId,
+      );
+
+      // get likes count before
+      let tweet = await program.account.tweet.fetch(bobTweetPDA);
+      let dislikesCountBefore = tweet.dislikes.toNumber();
+
+      await program.methods
+        .dislikeTweet()
+        .accounts({
+          author: james.publicKey,
+          reaction: jamesReactionPDA,
+          tweet: bobTweetPDA,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([james])
+        .rpc({ commitment: "confirmed" });
+
+      // fetch tweet
+      tweet = await program.account.tweet.fetch(bobTweetPDA);
+      assert.equal(tweet.dislikes.toNumber(), dislikesCountBefore + 1);
+
+      // fetch tweet reaction
+      const tweetReaction = await program.account.reaction.fetch(
+        jamesReactionPDA,
+      );
+      assert.equal(tweetReaction.author.toBase58(), james.publicKey);
+    });
+    it("fails when a user tries to like the same tweet more than once", async () => {
+      // alice tries to like bob's tweet the second time
+      let tweet = await program.account.tweet.fetch(bobTweetPDA);
+      let likesCountBefore = tweet.likes.toNumber();
+
+      try {
+        await program.methods
+          .likeTweet()
+          .accounts({
+            author: alice.publicKey,
+            reaction: aliceReactionPDA,
+            tweet: bobTweetPDA,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .signers([alice])
+          .rpc({ commitment: "confirmed" });
+      } catch (error) {
+        assert.strictEqual(
+          error.error.errorCode.code,
+          "CannotLikeMoreThanOnce",
+          "Expected 'CannotLikeMoreThanOnce' error for content longer than 500 bytes",
+        );
+      }
+
+      // likes count after
+      tweet = await program.account.tweet.fetch(bobTweetPDA);
+      let likesCountAfter = tweet.likes.toNumber();
+
+      // number of likes remains unaltered
+      assert.equal(likesCountAfter, likesCountBefore);
+    });
+    it("fails when a user tries to dislike the same tweet more than once", async () => {
+      // kama tries to dislike bob's tweet the second time
+      let tweet = await program.account.tweet.fetch(bobTweetPDA);
+      let dislikesCountBefore = tweet.dislikes.toNumber();
+
+      try {
+        await program.methods
+          .dislikeTweet()
+          .accounts({
+            author: kama.publicKey,
+            reaction: kamaReactionPDA1,
+            tweet: bobTweetPDA,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .signers([kama])
+          .rpc({ commitment: "confirmed" });
+      } catch (error) {
+        assert.strictEqual(
+          error.error.errorCode.code,
+          "CannotDislikeMoreThanOnce",
+          "Expected 'CannotDislikeMoreThanOnce' error for content longer than 500 bytes",
+        );
+      }
+
+      // likes count after
+      tweet = await program.account.tweet.fetch(bobTweetPDA);
+      let dislikesCountAfter = tweet.dislikes.toNumber();
+
+      // number of likes remains unaltered
+      assert.equal(dislikesCountAfter, dislikesCountBefore);
+    });
+    it("increments dislike after toggling from like", async () => {
+      // get tweet to dislike
+      let tweet = await program.account.tweet.fetch(bobTweetPDA);
+
+      let likesCountBefore = tweet.likes.toNumber();
+      let dislikesCountBefore = tweet.dislikes.toNumber();
+
+      // alice already liked bob's tweet before and now wants to dislike it
+      await program.methods
+        .dislikeTweet()
+        .accounts({
+          author: alice.publicKey,
+          reaction: aliceReactionPDA,
+          tweet: bobTweetPDA,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([alice])
+        .rpc({ commitment: "confirmed" });
+
+      // likes count after
+      tweet = await program.account.tweet.fetch(bobTweetPDA);
+      let likesCountAfter = tweet.likes.toNumber();
+      let dislikesCountAfter = tweet.dislikes.toNumber();
+
+      // number of likes reduced
+      assert.ok(likesCountAfter < likesCountBefore);
+      assert.ok(dislikesCountAfter > dislikesCountBefore);
+    });
+    it("increments likes after toggling from dislike", async () => {
+      // get tweet to dislike
+      let tweet = await program.account.tweet.fetch(aliceTweetPDA);
+
+      let likesCountBefore = tweet.likes.toNumber();
+      let dislikesCountBefore = tweet.dislikes.toNumber();
+
+      // kama has already disliked alice's tweet before and now wants to like it
+      await program.methods
+        .likeTweet()
+        .accounts({
+          author: kama.publicKey,
+          reaction: kamaReactionPDA2,
+          tweet: aliceTweetPDA,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([kama])
+        .rpc({ commitment: "confirmed" });
+
+      // likes count after
+      tweet = await program.account.tweet.fetch(aliceTweetPDA);
+      let likesCountAfter = tweet.likes.toNumber();
+      let dislikesCountAfter = tweet.dislikes.toNumber();
+
+      // number of likes increased
+      assert.ok(likesCountAfter > likesCountBefore);
+      assert.ok(dislikesCountAfter < dislikesCountBefore);
+    });
+  });
+
   // helpers
   const airdrop = async (publicKey: anchor.web3.PublicKey) => {
     const sig = await program.provider.connection.requestAirdrop(
@@ -477,5 +768,25 @@ describe("sol_twitter", () => {
       ],
       programID,
     );
+  };
+
+  const getReactionAddress = (
+    author: PublicKey,
+    tweet: PublicKey,
+    programID: PublicKey,
+  ) => {
+    return PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode(REACTION_SEED),
+        author.toBuffer(),
+        tweet.toBuffer(),
+      ],
+      programID,
+    );
+  };
+
+  const errorContains = (logs, error) => {
+    const match = logs?.filter((s) => s.includes(error));
+    return Boolean(match?.length);
   };
 });

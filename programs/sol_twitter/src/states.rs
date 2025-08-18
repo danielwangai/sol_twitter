@@ -4,6 +4,14 @@ pub const MaxTweetContentLength: usize = 280; // 280 chars max.
 pub const MaxCommentLength: usize = 280; // 280 chars max.
 pub const TWEET_SEED: &str = "TWEET_SEED";
 pub const COMMENT_SEED: &str = "COMMENT_SEED";
+pub const REACTION_SEED: &str = "REACTION_SEED";
+
+#[derive(AnchorDeserialize, AnchorSerialize, Clone, InitSpace)]
+pub enum ReactionType {
+    None,
+    Like,
+    Dislike,
+}
 
 #[account]
 #[derive(InitSpace)]
@@ -25,5 +33,14 @@ pub struct Comment {
     pub author: Pubkey,
     pub timestamp: i64,
     pub parent_tweet: Pubkey,
+    pub bump: u8,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct Reaction {
+    pub author: Pubkey,
+    pub parent_tweet: Pubkey,
+    pub reaction: ReactionType,
     pub bump: u8,
 }
