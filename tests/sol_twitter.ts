@@ -26,6 +26,7 @@ describe("sol_twitter", () => {
 
   // comments
   let comment1 = "happy to recommend you!";
+  let comment2 = "cool!";
 
   describe("Post tweet", async () => {
     it("can send a new tweet", async () => {
@@ -305,6 +306,129 @@ describe("sol_twitter", () => {
         "Failed",
         "Tweet initialization should have failed with topic longer than 32 bytes",
       );
+    });
+  });
+
+  describe("Remove comment", async () => {
+    let bobTweetPDA: anchor.web3.PublicKey;
+    let aliceCommentPDA: anchor.web3.PublicKey;
+    beforeEach(async () => {
+      await airdrop(bob.publicKey);
+      await airdrop(alice.publicKey);
+
+      // make every tweet created unique on every run to avoid getting the error
+      // Allocate: account ... already in use
+      let content = content1 + Date.now().toString();
+
+      [bobTweetPDA] = getTweetAddress(
+        content,
+        bob.publicKey,
+        program.programId,
+      );
+      [aliceCommentPDA] = getCommentAddress(
+        comment1,
+        alice.publicKey,
+        bobTweetPDA,
+        program.programId,
+      );
+
+      // bob posts a tweet
+      await program.methods
+        .postNewTweet(content)
+        .accounts({
+          author: bob.publicKey,
+          tweet: bobTweetPDA,
+        })
+        .signers([bob])
+        .rpc();
+
+      // alice comments on bob's tweet
+      await program.methods
+        .postNewComment(comment1)
+        .accounts({
+          author: alice.publicKey,
+          tweet: bobTweetPDA,
+          comment: aliceCommentPDA,
+        })
+        .signers([alice])
+        .rpc();
+    });
+
+    it("Should successfully remove existing comment from tweet", async () => {
+      // const aliceCommentPDA = await postTweetWithComment();
+      await program.methods
+        .deleteComment()
+        .accounts({
+          author: alice.publicKey,
+          comment: aliceCommentPDA,
+        })
+        .signers([alice])
+        .rpc({ commitment: "confirmed" });
+
+      let thisShouldFail = "This should fail";
+      try {
+        let commentData = await program.account.comment.fetch(aliceCommentPDA);
+      } catch (error) {
+        thisShouldFail = "Failed";
+        assert.ok(
+          error.message.includes("Account does not exist or has no data"),
+          "Comment account should be deleted after removal",
+        );
+      }
+      assert.strictEqual(
+        thisShouldFail,
+        "Failed",
+        "Comment account should not exist after being removed",
+      );
+    });
+
+    it("should not allow a user to delete another user's comment", async () => {
+      // const aliceCommentPDA = await postTweetWithComment();
+      // bob tries to remove alice's comment and fails
+      try {
+        await program.methods
+          .deleteComment()
+          .accounts({
+            author: bob.publicKey,
+            comment: aliceCommentPDA,
+          })
+          .signers([bob])
+          .rpc({ commitment: "confirmed" });
+      } catch (error) {
+        assert.ok(
+          error.message.includes("constraint") ||
+            error.message.includes("seeds"),
+          "Expected constraint or seeds error when trying to remove someone else's comment",
+        );
+      }
+    });
+
+    it("Should fail when attempting to remove non-existent comment", async () => {
+      // this comment doesn't exist in bob's tweet
+      const fakeComment = "This comment doesn't exist";
+      const [commentPDA] = getCommentAddress(
+        fakeComment,
+        alice.publicKey,
+        bobTweetPDA,
+        program.programId,
+      );
+
+      try {
+        await program.methods
+          .deleteComment()
+          .accounts({
+            author: alice.publicKey,
+            comment: commentPDA,
+          })
+          .signers([alice])
+          .rpc({ commitment: "confirmed" });
+      } catch (error) {
+        assert.ok(
+          error.message.includes("Account does not exist") ||
+            error.message.includes("AccountNotInitialized"),
+          "Expected account not found error when trying to remove non-existent comment",
+        );
+      }
     });
   });
 
