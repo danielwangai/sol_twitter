@@ -30,4 +30,12 @@ pub mod solana_twitter {
     pub fn dislike_tweet(ctx: Context<ReactToTweet>) -> Result<()> {
         react_to_tweet(ctx, ReactionType::Dislike)
     }
+
+    pub fn like_comment(ctx: Context<ReactToComment>) -> Result<()> {
+        react_to_comment(ctx, ReactionType::Like)
+    }
+
+    pub fn dislike_comment(ctx: Context<ReactToComment>) -> Result<()> {
+        react_to_comment(ctx, ReactionType::Dislike)
+    }
 }

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use crate::errors::TwitterError;
-use crate::states::{Reaction, ReactionType, Tweet, REACTION_SEED};
+use crate::states::{TweetReaction, ReactionType, Tweet, TWEET_REACTION_SEED};
 
 pub fn react_to_tweet(ctx: Context<ReactToTweet>, reaction: ReactionType) -> Result<()> {
     let tweet = &mut ctx.accounts.tweet;
@@ -11,7 +11,7 @@ pub fn react_to_tweet(ctx: Context<ReactToTweet>, reaction: ReactionType) -> Res
     }
 
     tweet_reaction.author = ctx.accounts.author.key();
-    tweet_reaction.parent_tweet = tweet.key();
+    tweet_reaction.tweet = tweet.key();
 
     match (&tweet_reaction.reaction, &reaction) {
         (ReactionType::None, ReactionType::Like) => {
@@ -52,11 +52,11 @@ pub struct ReactToTweet<'info> {
     #[account(
         init_if_needed,
         payer = author,
-        space = 8 + Reaction::INIT_SPACE,
-        seeds = [REACTION_SEED.as_bytes(), author.key().as_ref(), tweet.key().as_ref()],
+        space = 8 + TweetReaction::INIT_SPACE,
+        seeds = [TWEET_REACTION_SEED.as_bytes(), author.key().as_ref(), tweet.key().as_ref()],
         bump
     )]
-    pub reaction: Account<'info, Reaction>,
+    pub reaction: Account<'info, TweetReaction>,
     #[account(mut)]
     pub tweet: Account<'info, Tweet>,
     pub system_program: Program<'info, System>,

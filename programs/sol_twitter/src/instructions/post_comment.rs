@@ -20,6 +20,8 @@ pub fn post_comment(ctx: Context<PostComment>, tweet_comment: String) -> Result<
     new_comment.author = ctx.accounts.author.key();
     new_comment.timestamp = Clock::get()?.unix_timestamp;
     new_comment.parent_tweet = ctx.accounts.tweet.key();
+    new_comment.likes = 0;
+    new_comment.dislikes = 0;
     new_comment.bump = ctx.bumps.comment;
 
     Ok(())
