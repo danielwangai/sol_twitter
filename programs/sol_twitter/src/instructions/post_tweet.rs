@@ -41,7 +41,7 @@ pub struct PostTweet<'info> {
     #[account(
         init,
         payer = author,
-        space = TWEET_SIZE,
+        space = Tweet::INIT_SPACE,
         seeds = [TWEET_SEED.as_bytes(), content.as_bytes(), author.key().as_ref()],
         bump,
     )]
